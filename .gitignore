@@ -1,0 +1,24 @@
+# Generated from https://www.toptal.com/developers/gitignore/api/rust,linux,macos,windows,vscode,intellij
+
+# Rust
+/target/
+Cargo.lock
+**/*.rs.bk
+
+# IDEs and editors
+.vscode/
+.idea/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Env and local overrides
+.env
+.env.*
+
+# Coverage and test artifacts
+coverage/
+*.profraw
+*.profdata

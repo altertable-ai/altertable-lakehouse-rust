@@ -1,0 +1,40 @@
+[package]
+name = "altertable-lakehouse"
+version = "0.1.0"
+edition = "2021"
+description = "Official Rust SDK for the Altertable Lakehouse API"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/altertable-ai/altertable-lakehouse-rust"
+homepage = "https://altertable.ai"
+documentation = "https://docs.rs/altertable-lakehouse"
+keywords = ["altertable", "lakehouse", "sql", "api", "client"]
+categories = ["api-bindings", "database"]
+
+[lib]
+name = "altertable_lakehouse"
+path = "src/lib.rs"
+
+[dependencies]
+base64 = "0.22"
+futures-util = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_plain = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+uuid = { version = "1", features = ["serde", "v4"] }
+
+[dev-dependencies]
+serde_json = "1"
+testcontainers = "0.25"
+testcontainers-modules = { version = "0.13", features = ["blocking"] }
+wiremock = "0.6"
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
