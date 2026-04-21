@@ -55,6 +55,7 @@ pub enum AltertableError {
 }
 
 impl AltertableError {
+    #[must_use]
     pub fn context(&self) -> Option<&ErrorContext> {
         match self {
             Self::AuthError { context, .. }
@@ -68,6 +69,7 @@ impl AltertableError {
         }
     }
 
+    #[must_use]
     pub fn from_reqwest(error: reqwest::Error, context: ErrorContext) -> Self {
         let message = error.to_string();
         if error.is_timeout() {
@@ -85,6 +87,7 @@ impl AltertableError {
         }
     }
 
+    #[must_use]
     pub fn from_status(context: ErrorContext, status: StatusCode, body: String) -> Self {
         let message = if body.is_empty() {
             format!("request failed with status {status}")
