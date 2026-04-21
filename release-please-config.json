@@ -1,0 +1,9 @@
+{
+  "packages": {
+    ".": {
+      "release-type": "rust",
+      "package-name": "altertable-lakehouse",
+      "version-file": "Cargo.toml"
+    }
+  }
+}
