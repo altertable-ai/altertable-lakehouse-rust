@@ -1,12 +1,16 @@
 use crate::error::{AltertableError, ErrorContext};
-use crate::models::*;
+use crate::models::{
+    AppendRequest, AppendResponse, CancelQueryResponse, QueryColumn, QueryLogResponse,
+    QueryMetadata, QueryRequest, QueryRow, TaskResponse, UploadFormat, UploadMode, ValidateRequest,
+    ValidateResponse,
+};
 use base64::Engine;
 use futures_util::{Stream, StreamExt};
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE, USER_AGENT};
 use reqwest::{Client, Method, Response, StatusCode};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -94,46 +98,55 @@ pub struct QueryResultAll {
 }
 
 impl ClientBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn base_url(mut self, base_url: impl Into<String>) -> Self {
         self.base_url = Some(base_url.into());
         self
     }
 
+    #[must_use]
     pub fn credentials(mut self, username: impl Into<String>, password: impl Into<String>) -> Self {
         self.username = Some(username.into());
         self.password = Some(password.into());
         self
     }
 
+    #[must_use]
     pub fn basic_token(mut self, token: impl Into<String>) -> Self {
         self.basic_token = Some(token.into());
         self
     }
 
+    #[must_use]
     pub fn connect_timeout(mut self, timeout: Duration) -> Self {
         self.connect_timeout = Some(timeout);
         self
     }
 
+    #[must_use]
     pub fn request_timeout(mut self, timeout: Duration) -> Self {
         self.request_timeout = Some(timeout);
         self
     }
 
+    #[must_use]
     pub fn retry(mut self, retry: RetryConfig) -> Self {
         self.retry = Some(retry);
         self
     }
 
+    #[must_use]
     pub fn user_agent_suffix(mut self, suffix: impl Into<String>) -> Self {
         self.user_agent_suffix = Some(suffix.into());
         self
     }
 
+    #[must_use = "call `build` to construct an `AltertableClient`"]
     pub fn build(self) -> Result<AltertableClient, AltertableError> {
         let auth = resolve_auth(self.username, self.password, self.basic_token)?;
         let config = ClientConfig {
@@ -152,6 +165,7 @@ impl ClientBuilder {
 }
 
 impl AltertableClient {
+    #[must_use]
     pub fn builder() -> ClientBuilder {
         ClientBuilder::new()
     }
@@ -197,9 +211,9 @@ impl AltertableClient {
         table: &str,
         body: &AppendRequest,
     ) -> Result<AppendResponse, AltertableError> {
-        self.ensure_non_empty("catalog", catalog)?;
-        self.ensure_non_empty("schema", schema)?;
-        self.ensure_non_empty("table", table)?;
+        ensure_non_empty("catalog", catalog)?;
+        ensure_non_empty("schema", schema)?;
+        ensure_non_empty("table", table)?;
 
         self.send_json(
             "append",
@@ -215,13 +229,13 @@ impl AltertableClient {
         &self,
         request: &ValidateRequest,
     ) -> Result<ValidateResponse, AltertableError> {
-        self.ensure_non_empty("statement", &request.statement)?;
+        ensure_non_empty("statement", &request.statement)?;
         self.send_json("validate", Method::POST, "/validate", vec![], Some(request))
             .await
     }
 
     pub async fn get_query(&self, query_id: &str) -> Result<QueryLogResponse, AltertableError> {
-        self.ensure_non_empty("query_id", query_id)?;
+        ensure_non_empty("query_id", query_id)?;
         let path = format!("/query/{query_id}");
         self.send_json::<(), QueryLogResponse>("get_query", Method::GET, &path, vec![], None)
             .await
@@ -232,8 +246,8 @@ impl AltertableClient {
         query_id: &str,
         session_id: &str,
     ) -> Result<CancelQueryResponse, AltertableError> {
-        self.ensure_non_empty("query_id", query_id)?;
-        self.ensure_non_empty("session_id", session_id)?;
+        ensure_non_empty("query_id", query_id)?;
+        ensure_non_empty("session_id", session_id)?;
         let path = format!("/query/{query_id}");
         self.send_json::<(), CancelQueryResponse>(
             "cancel_query",
@@ -245,6 +259,7 @@ impl AltertableClient {
         .await
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn upload(
         &self,
         catalog: &str,
@@ -255,9 +270,9 @@ impl AltertableClient {
         primary_key: Option<&str>,
         bytes: Vec<u8>,
     ) -> Result<TaskResponse, AltertableError> {
-        self.ensure_non_empty("catalog", catalog)?;
-        self.ensure_non_empty("schema", schema)?;
-        self.ensure_non_empty("table", table)?;
+        ensure_non_empty("catalog", catalog)?;
+        ensure_non_empty("schema", schema)?;
+        ensure_non_empty("table", table)?;
         if matches!(mode, UploadMode::Upsert) && primary_key.is_none() {
             return Err(AltertableError::ConfigurationError {
                 message: "primary_key is required when mode=upsert".to_string(),
@@ -291,7 +306,7 @@ impl AltertableClient {
             .map_err(|error| {
                 AltertableError::from_reqwest(
                     error,
-                    self.context("upload", "POST", "/upload", None, false, None),
+                    error_context("upload", "POST", "/upload", None, false, None),
                 )
             })?;
 
@@ -300,7 +315,7 @@ impl AltertableClient {
     }
 
     pub async fn query(&self, request: &QueryRequest) -> Result<QueryResult, AltertableError> {
-        self.ensure_non_empty("statement", &request.statement)?;
+        ensure_non_empty("statement", &request.statement)?;
 
         let response = self
             .request("query", Method::POST, "/query")
@@ -311,7 +326,7 @@ impl AltertableClient {
             .map_err(|error| {
                 AltertableError::from_reqwest(
                     error,
-                    self.context("query", "POST", "/query", None, false, None),
+                    error_context("query", "POST", "/query", None, false, None),
                 )
             })?;
 
@@ -371,7 +386,7 @@ impl AltertableClient {
         let response = request.send().await.map_err(|error| {
             AltertableError::from_reqwest(
                 error,
-                self.context(operation, method.as_str(), path, None, false, None),
+                error_context(operation, method.as_str(), path, None, false, None),
             )
         })?;
 
@@ -394,7 +409,7 @@ impl AltertableClient {
         let body = response.text().await.map_err(|error| {
             AltertableError::from_reqwest(
                 error,
-                self.context(
+                error_context(
                     operation,
                     method.as_str(),
                     path,
@@ -407,7 +422,7 @@ impl AltertableClient {
 
         if !status.is_success() {
             return Err(AltertableError::from_status(
-                self.context(
+                error_context(
                     operation,
                     method.as_str(),
                     path,
@@ -421,7 +436,7 @@ impl AltertableClient {
         }
 
         serde_json::from_str(&body).map_err(|error| AltertableError::SerializationError {
-            context: self.context(
+            context: error_context(
                 operation,
                 method.as_str(),
                 path,
@@ -443,7 +458,7 @@ impl AltertableClient {
         if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
             return Err(AltertableError::from_status(
-                self.context(
+                error_context(
                     "query",
                     "POST",
                     "/query",
@@ -459,7 +474,7 @@ impl AltertableClient {
         let bytes = response.bytes().await.map_err(|error| {
             AltertableError::from_reqwest(
                 error,
-                self.context(
+                error_context(
                     "query",
                     "POST",
                     "/query",
@@ -471,7 +486,7 @@ impl AltertableClient {
         })?;
         let text =
             String::from_utf8(bytes.to_vec()).map_err(|error| AltertableError::ParseError {
-                context: self.context(
+                context: error_context(
                     "query",
                     "POST",
                     "/query",
@@ -497,7 +512,7 @@ impl AltertableClient {
 
             let value: Value =
                 serde_json::from_str(trimmed).map_err(|error| AltertableError::ParseError {
-                    context: self.context(
+                    context: error_context(
                         "query",
                         "POST",
                         "/query",
@@ -524,7 +539,7 @@ impl AltertableClient {
         }
 
         let metadata = metadata.unwrap_or(QueryMetadata {
-            values: Default::default(),
+            values: HashMap::default(),
         });
         let columns = columns.unwrap_or_default();
         let stream = futures_util::stream::iter(rows.into_iter().map(Ok));
@@ -537,35 +552,6 @@ impl AltertableClient {
             },
         })
     }
-
-    fn context(
-        &self,
-        operation: &'static str,
-        method: &str,
-        path: &str,
-        status: Option<StatusCode>,
-        retriable: bool,
-        headers: Option<&HeaderMap>,
-    ) -> ErrorContext {
-        ErrorContext {
-            operation,
-            method: method_to_static(method),
-            path: path.to_string(),
-            status: status.map(|s| s.as_u16()),
-            retriable,
-            request_id: headers.and_then(|h| header_value(h, "x-request-id")),
-            correlation_id: headers.and_then(|h| header_value(h, "x-correlation-id")),
-        }
-    }
-
-    fn ensure_non_empty(&self, field: &str, value: &str) -> Result<(), AltertableError> {
-        if value.trim().is_empty() {
-            return Err(AltertableError::ConfigurationError {
-                message: format!("{field} must not be empty"),
-            });
-        }
-        Ok(())
-    }
 }
 
 impl Stream for QueryRowStream {
@@ -573,6 +559,34 @@ impl Stream for QueryRowStream {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.inner.as_mut().poll_next(cx)
+    }
+}
+
+fn ensure_non_empty(field: &str, value: &str) -> Result<(), AltertableError> {
+    if value.trim().is_empty() {
+        return Err(AltertableError::ConfigurationError {
+            message: format!("{field} must not be empty"),
+        });
+    }
+    Ok(())
+}
+
+fn error_context(
+    operation: &'static str,
+    method: &str,
+    path: &str,
+    status: Option<StatusCode>,
+    retriable: bool,
+    headers: Option<&HeaderMap>,
+) -> ErrorContext {
+    ErrorContext {
+        operation,
+        method: method_to_static(method),
+        path: path.to_string(),
+        status: status.map(|s| s.as_u16()),
+        retriable,
+        request_id: headers.and_then(|h| header_value(h, "x-request-id")),
+        correlation_id: headers.and_then(|h| header_value(h, "x-correlation-id")),
     }
 }
 
@@ -641,8 +655,8 @@ fn parse_metadata(value: &Value) -> QueryMetadata {
 
 fn is_columns_line(value: &Value) -> bool {
     match value {
-        Value::Array(items) => items.iter().all(|item| item.is_object()),
-        Value::Object(map) => map.get("columns").map(Value::is_array).unwrap_or(false),
+        Value::Array(items) => items.iter().all(Value::is_object),
+        Value::Object(map) => map.get("columns").is_some_and(Value::is_array),
         _ => false,
     }
 }
@@ -699,7 +713,7 @@ mod tests {
                 assert_eq!(username, "user");
                 assert_eq!(password, "pass");
             }
-            _ => panic!("expected basic auth"),
+            AuthConfig::BasicToken(_) => panic!("expected basic auth"),
         }
     }
 

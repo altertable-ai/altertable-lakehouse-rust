@@ -1,6 +1,6 @@
 use altertable_lakehouse::{
-    AltertableClient, AppendRequest, ComputeSize, QueryColumn, QueryRequest, UploadFormat,
-    UploadMode, ValidateRequest,
+    AltertableClient, AppendRequest, ComputeSize, QueryRequest, UploadFormat, UploadMode,
+    ValidateRequest,
 };
 use futures_util::StreamExt;
 use serde_json::json;
@@ -69,22 +69,14 @@ fn validate_request_requires_statement() {
 
 #[tokio::test]
 async fn query_stream_can_be_consumed_from_manual_result() {
-    let _columns = vec![QueryColumn {
-        name: "value".into(),
-        data_type: Some("Int32".into()),
-        nullable: Some(false),
-        extra: HashMap::new(),
-    }];
-
     let client = AltertableClient::builder()
         .credentials("user", "pass")
         .base_url("http://localhost:15000")
         .build()
         .unwrap();
 
-    let error = match client.query(&QueryRequest::default()).await {
-        Ok(_) => panic!("expected empty statement to fail"),
-        Err(error) => error,
+    let Err(error) = client.query(&QueryRequest::default()).await else {
+        panic!("expected empty statement to fail");
     };
     assert!(error.to_string().contains("statement must not be empty"));
 
