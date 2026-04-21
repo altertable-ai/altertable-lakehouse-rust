@@ -8,7 +8,8 @@ Official Rust SDK for the Altertable Lakehouse API.
 - Basic auth via direct credentials, pre-encoded token, or environment discovery
 - Streamed NDJSON query support with accumulated `query_all`
 - `reqwest` + `rustls` transport with keep-alive and sensible timeout defaults
-- Mock-ready test coverage for serialization, auth, request validation, and query parsing
+- Mock-backed integration coverage via Testcontainers for query, query_all, get_query, cancel_query, validate, append, and upload
+- Request-level coverage for serialization, auth, request validation, and query parsing
 
 ## Installation
 
@@ -199,3 +200,5 @@ PATH=/usr/bin:/bin:$PATH cargo fmt --all
 PATH=/usr/bin:/bin:$PATH cargo clippy --all-targets --all-features -- -D warnings
 PATH=/usr/bin:/bin:$PATH cargo test --all-features
 ```
+
+The integration suite starts `ghcr.io/altertable-ai/altertable-mock:latest` automatically with Testcontainers and runs against the mapped `localhost` port.
