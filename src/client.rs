@@ -17,7 +17,7 @@ use std::time::Duration;
 
 const DEFAULT_BASE_URL: &str = "https://api.altertable.ai";
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
-const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
+const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_mins(1);
 const DEFAULT_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -179,7 +179,7 @@ impl AltertableClient {
             .connect_timeout(config.connect_timeout)
             .timeout(config.request_timeout)
             .pool_max_idle_per_host(8)
-            .tcp_keepalive(Duration::from_secs(60))
+            .tcp_keepalive(Duration::from_mins(1))
             .build()
             .map_err(|error| AltertableError::ConfigurationError {
                 message: format!("failed to build HTTP client: {error}"),
