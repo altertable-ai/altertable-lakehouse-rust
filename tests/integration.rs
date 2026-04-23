@@ -1,6 +1,7 @@
 use altertable_lakehouse::{
     AltertableClient, AppendRequest, QueryRequest, UploadFormat, UploadMode, ValidateRequest,
 };
+use anyhow::Result;
 use futures_util::StreamExt;
 use serde_json::json;
 use std::collections::HashMap;
@@ -38,7 +39,7 @@ fn client(base_url: String) -> AltertableClient {
 }
 
 #[tokio::test]
-async fn validate_and_query_endpoints_work_against_mock() {
+async fn validate_and_query_endpoints_work_against_mock() -> Result<()> {
     let (_container, base_url) = spawn_mock().await;
     let client = client(base_url);
 
@@ -73,13 +74,13 @@ async fn validate_and_query_endpoints_work_against_mock() {
             statement: "SELECT 1".into(),
             ..Default::default()
         })
-        .await
-        .expect("query_all should succeed");
+        .await?;
     assert_eq!(query_all.rows, vec![json!(["1"]), json!([1])]);
+
+    Ok(())
 }
 
-#[tokio::test]
-async fn query_log_and_cancel_endpoints_work_against_mock() {
+async fn run_query_log_and_cancel_endpoints_work_against_mock() -> Result<()> {
     let (_container, base_url) = spawn_mock().await;
     let client = client(base_url);
 
@@ -88,8 +89,7 @@ async fn query_log_and_cancel_endpoints_work_against_mock() {
             statement: "SELECT 1".into(),
             ..Default::default()
         })
-        .await
-        .expect("query_all should succeed");
+        .await?;
 
     let query_id = query.metadata.values["query_id"]
         .as_str()
@@ -100,18 +100,35 @@ async fn query_log_and_cancel_endpoints_work_against_mock() {
         .expect("session_id should be present")
         .to_string();
 
-    let log = client
-        .get_query(&query_id)
-        .await
-        .expect("get_query should succeed");
+    let log = client.get_query(&query_id).await?;
     assert_eq!(log.log.query, "SELECT 1");
     assert_eq!(log.log.session_id, session_id);
 
-    let cancel = client
-        .cancel_query(&query_id, &session_id)
-        .await
-        .expect("cancel_query should succeed");
+    let cancel = client.cancel_query(&query_id, &session_id).await?;
     assert!(!cancel.message.trim().is_empty());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn query_log_and_cancel_endpoints_work_against_mock() {
+    let mut last_error = None;
+
+    for _ in 0..3 {
+        match run_query_log_and_cancel_endpoints_work_against_mock().await {
+            Ok(()) => return,
+            Err(error) => {
+                let is_connection_reset = error.to_string().contains("Connection reset by peer");
+                if !is_connection_reset {
+                    panic!("query log/cancel integration failed: {error}");
+                }
+                last_error = Some(error);
+            }
+        }
+    }
+
+    let error = last_error.expect("expected a connection reset error");
+    panic!("query log/cancel integration remained flaky after retries: {error}");
 }
 
 #[tokio::test]
