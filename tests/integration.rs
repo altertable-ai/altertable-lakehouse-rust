@@ -1,5 +1,6 @@
 use altertable_lakehouse::{
-    AltertableClient, AppendRequest, QueryRequest, UploadFormat, UploadMode, ValidateRequest,
+    AltertableClient, AppendRequest, AutocompleteRequest, QueryRequest, UploadFormat, UploadMode,
+    ValidateRequest,
 };
 use futures_util::StreamExt;
 use serde_json::json;
@@ -76,6 +77,19 @@ async fn validate_and_query_endpoints_work_against_mock() {
         .await
         .expect("query_all should succeed");
     assert_eq!(query_all.rows, vec![json!(["1"]), json!([1])]);
+
+    let autocomplete = client
+        .autocomplete(&AutocompleteRequest {
+            statement: "SEL".into(),
+            max_suggestions: Some(5),
+            ..Default::default()
+        })
+        .await
+        .expect("autocomplete should succeed");
+    assert_eq!(autocomplete.statement, "SEL");
+    assert!(!autocomplete.suggestions.is_empty());
+    assert!(autocomplete.suggestions.len() <= 5);
+    assert!(autocomplete.connections_errors.is_empty());
 }
 
 #[tokio::test]
@@ -123,11 +137,24 @@ async fn append_and_upload_return_mock_responses() {
         .into_iter()
         .collect();
     let append = client
-        .append("demo", "public", "events", &AppendRequest::Single(payload))
+        .append(
+            "demo",
+            "public",
+            "events",
+            Some(false),
+            &AppendRequest::Single(payload),
+        )
         .await
         .expect("append should respond");
     assert!(!append.ok);
     assert!(append.error_code.is_some());
+    if let Some(task_id) = append.task_id {
+        let task = client
+            .get_task(&task_id.to_string())
+            .await
+            .expect("get_task should succeed when append returns task_id");
+        assert_eq!(task.task_id, task_id);
+    }
 
     let upload_error = client
         .upload(

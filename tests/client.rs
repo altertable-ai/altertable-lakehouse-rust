@@ -1,6 +1,6 @@
 use altertable_lakehouse::{
-    AltertableClient, AppendRequest, ComputeSize, QueryRequest, UploadFormat, UploadMode,
-    ValidateRequest,
+    AltertableClient, AppendRequest, AutocompleteRequest, ComputeSize, QueryRequest, UploadFormat,
+    UploadMode, ValidateRequest,
 };
 use futures_util::StreamExt;
 use serde_json::json;
@@ -10,12 +10,14 @@ use std::collections::HashMap;
 fn query_request_serializes_enums() {
     let request = QueryRequest {
         statement: "select 1".into(),
-        compute_size: Some(ComputeSize::M),
+        compute_size: Some(ComputeSize::XL),
+        cache: Some(true),
         ..Default::default()
     };
 
     let value = serde_json::to_value(request).unwrap();
-    assert_eq!(value["compute_size"], json!("M"));
+    assert_eq!(value["compute_size"], json!("XL"));
+    assert_eq!(value["cache"], json!(true));
 }
 
 #[test]
@@ -49,6 +51,21 @@ fn append_request_round_trips() {
     let request = AppendRequest::Batch(vec![payload]);
     let value = serde_json::to_value(&request).unwrap();
     assert!(value.is_array());
+}
+
+#[test]
+fn autocomplete_request_serializes_optional_fields() {
+    let request = AutocompleteRequest {
+        statement: "SEL".into(),
+        catalog: Some("demo".into()),
+        schema: Some("public".into()),
+        session_id: Some("session-123".into()),
+        max_suggestions: Some(5),
+    };
+
+    let value = serde_json::to_value(request).unwrap();
+    assert_eq!(value["statement"], json!("SEL"));
+    assert_eq!(value["max_suggestions"], json!(5));
 }
 
 #[test]

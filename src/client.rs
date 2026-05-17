@@ -1,8 +1,8 @@
 use crate::error::{AltertableError, ErrorContext};
 use crate::models::{
-    AppendRequest, AppendResponse, CancelQueryResponse, QueryColumn, QueryLogResponse,
-    QueryMetadata, QueryRequest, QueryRow, TaskResponse, UploadFormat, UploadMode, ValidateRequest,
-    ValidateResponse,
+    AppendRequest, AppendResponse, AutocompleteRequest, AutocompleteResponse, CancelQueryResponse,
+    QueryColumn, QueryLogResponse, QueryMetadata, QueryRequest, QueryRow, TaskResponse,
+    UploadFormat, UploadMode, ValidateRequest, ValidateResponse,
 };
 use base64::Engine;
 use futures_util::{Stream, StreamExt};
@@ -209,20 +209,27 @@ impl AltertableClient {
         catalog: &str,
         schema: &str,
         table: &str,
+        sync: Option<bool>,
         body: &AppendRequest,
     ) -> Result<AppendResponse, AltertableError> {
         ensure_non_empty("catalog", catalog)?;
         ensure_non_empty("schema", schema)?;
         ensure_non_empty("table", table)?;
 
-        self.send_json(
-            "append",
-            Method::POST,
-            "/append",
-            vec![("catalog", catalog), ("schema", schema), ("table", table)],
-            Some(body),
-        )
-        .await
+        let mut query = vec![("catalog", catalog), ("schema", schema), ("table", table)];
+        if let Some(sync) = sync {
+            query.push(("sync", if sync { "true" } else { "false" }));
+        }
+
+        self.send_json("append", Method::POST, "/append", query, Some(body))
+            .await
+    }
+
+    pub async fn get_task(&self, task_id: &str) -> Result<TaskResponse, AltertableError> {
+        ensure_non_empty("task_id", task_id)?;
+        let path = format!("/tasks/{task_id}");
+        self.send_json::<(), TaskResponse>("get_task", Method::GET, &path, vec![], None)
+            .await
     }
 
     pub async fn validate(
@@ -331,6 +338,21 @@ impl AltertableClient {
             })?;
 
         self.decode_query_response(response).await
+    }
+
+    pub async fn autocomplete(
+        &self,
+        request: &AutocompleteRequest,
+    ) -> Result<AutocompleteResponse, AltertableError> {
+        ensure_non_empty("statement", &request.statement)?;
+        self.send_json(
+            "autocomplete",
+            Method::POST,
+            "/autocomplete",
+            vec![],
+            Some(request),
+        )
+        .await
     }
 
     pub async fn query_all(
