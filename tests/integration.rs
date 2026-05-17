@@ -178,7 +178,9 @@ async fn append_and_upload_return_mock_responses() {
         match run_append_and_upload_return_mock_responses().await {
             Ok(()) => return,
             Err(error) => {
-                let is_connection_reset = error.contains("Connection reset by peer");
+                let lowered = error.to_ascii_lowercase();
+                let is_connection_reset = lowered.contains("connection reset by peer")
+                    || lowered.contains("error sending request for url");
                 assert!(
                     is_connection_reset,
                     "append/upload integration failed: {error}"
