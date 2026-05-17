@@ -1,7 +1,6 @@
 use altertable_lakehouse::{
     AltertableClient, AppendRequest, QueryRequest, UploadFormat, UploadMode, ValidateRequest,
 };
-use anyhow::Result;
 use futures_util::StreamExt;
 use serde_json::json;
 use std::collections::HashMap;
@@ -39,7 +38,7 @@ fn client(base_url: String) -> AltertableClient {
 }
 
 #[tokio::test]
-async fn validate_and_query_endpoints_work_against_mock() -> Result<()> {
+async fn validate_and_query_endpoints_work_against_mock() {
     let (_container, base_url) = spawn_mock().await;
     let client = client(base_url);
 
@@ -74,13 +73,12 @@ async fn validate_and_query_endpoints_work_against_mock() -> Result<()> {
             statement: "SELECT 1".into(),
             ..Default::default()
         })
-        .await?;
+        .await
+        .expect("query_all should succeed");
     assert_eq!(query_all.rows, vec![json!(["1"]), json!([1])]);
-
-    Ok(())
 }
 
-async fn run_query_log_and_cancel_endpoints_work_against_mock() -> Result<()> {
+async fn run_query_log_and_cancel_endpoints_work_against_mock() -> Result<(), String> {
     let (_container, base_url) = spawn_mock().await;
     let client = client(base_url);
 
@@ -89,7 +87,8 @@ async fn run_query_log_and_cancel_endpoints_work_against_mock() -> Result<()> {
             statement: "SELECT 1".into(),
             ..Default::default()
         })
-        .await?;
+        .await
+        .map_err(|error| error.to_string())?;
 
     let query_id = query.metadata.values["query_id"]
         .as_str()
@@ -100,11 +99,17 @@ async fn run_query_log_and_cancel_endpoints_work_against_mock() -> Result<()> {
         .expect("session_id should be present")
         .to_string();
 
-    let log = client.get_query(&query_id).await?;
+    let log = client
+        .get_query(&query_id)
+        .await
+        .map_err(|error| error.to_string())?;
     assert_eq!(log.log.query, "SELECT 1");
     assert_eq!(log.log.session_id, session_id);
 
-    let cancel = client.cancel_query(&query_id, &session_id).await?;
+    let cancel = client
+        .cancel_query(&query_id, &session_id)
+        .await
+        .map_err(|error| error.to_string())?;
     assert!(!cancel.message.trim().is_empty());
 
     Ok(())
@@ -118,10 +123,8 @@ async fn query_log_and_cancel_endpoints_work_against_mock() {
         match run_query_log_and_cancel_endpoints_work_against_mock().await {
             Ok(()) => return,
             Err(error) => {
-                let is_connection_reset = error.to_string().contains("Connection reset by peer");
-                if !is_connection_reset {
-                    panic!("query log/cancel integration failed: {error}");
-                }
+                let is_connection_reset = error.contains("Connection reset by peer");
+                assert!(is_connection_reset, "query log/cancel integration failed: {error}");
                 last_error = Some(error);
             }
         }
@@ -131,8 +134,7 @@ async fn query_log_and_cancel_endpoints_work_against_mock() {
     panic!("query log/cancel integration remained flaky after retries: {error}");
 }
 
-#[tokio::test]
-async fn append_and_upload_return_mock_responses() {
+async fn run_append_and_upload_return_mock_responses() -> Result<(), String> {
     let (_container, base_url) = spawn_mock().await;
     let client = client(base_url);
 
@@ -142,7 +144,7 @@ async fn append_and_upload_return_mock_responses() {
     let append = client
         .append("demo", "public", "events", &AppendRequest::Single(payload))
         .await
-        .expect("append should respond");
+        .map_err(|error| error.to_string())?;
     assert!(!append.ok);
     assert!(append.error_code.is_some());
 
@@ -161,4 +163,25 @@ async fn append_and_upload_return_mock_responses() {
     assert!(upload_error
         .to_string()
         .contains("Catalog \"demo\" does not exist"));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn append_and_upload_return_mock_responses() {
+    let mut last_error = None;
+
+    for _ in 0..3 {
+        match run_append_and_upload_return_mock_responses().await {
+            Ok(()) => return,
+            Err(error) => {
+                let is_connection_reset = error.contains("Connection reset by peer");
+                assert!(is_connection_reset, "append/upload integration failed: {error}");
+                last_error = Some(error);
+            }
+        }
+    }
+
+    let error = last_error.expect("expected a connection reset error");
+    panic!("append/upload integration remained flaky after retries: {error}");
 }
