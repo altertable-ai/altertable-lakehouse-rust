@@ -124,7 +124,10 @@ async fn query_log_and_cancel_endpoints_work_against_mock() {
             Ok(()) => return,
             Err(error) => {
                 let is_connection_reset = error.contains("Connection reset by peer");
-                assert!(is_connection_reset, "query log/cancel integration failed: {error}");
+                assert!(
+                    is_connection_reset,
+                    "query log/cancel integration failed: {error}"
+                );
                 last_error = Some(error);
             }
         }
@@ -176,7 +179,10 @@ async fn append_and_upload_return_mock_responses() {
             Ok(()) => return,
             Err(error) => {
                 let is_connection_reset = error.contains("Connection reset by peer");
-                assert!(is_connection_reset, "append/upload integration failed: {error}");
+                assert!(
+                    is_connection_reset,
+                    "append/upload integration failed: {error}"
+                );
                 last_error = Some(error);
             }
         }
