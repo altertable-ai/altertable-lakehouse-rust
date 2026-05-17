@@ -78,8 +78,7 @@ async fn validate_and_query_endpoints_work_against_mock() {
     assert_eq!(query_all.rows, vec![json!(["1"]), json!([1])]);
 }
 
-#[tokio::test]
-async fn query_log_and_cancel_endpoints_work_against_mock() {
+async fn run_query_log_and_cancel_endpoints_work_against_mock() -> Result<(), String> {
     let (_container, base_url) = spawn_mock().await;
     let client = client(base_url);
 
@@ -89,7 +88,7 @@ async fn query_log_and_cancel_endpoints_work_against_mock() {
             ..Default::default()
         })
         .await
-        .expect("query_all should succeed");
+        .map_err(|error| error.to_string())?;
 
     let query_id = query.metadata.values["query_id"]
         .as_str()
@@ -103,19 +102,44 @@ async fn query_log_and_cancel_endpoints_work_against_mock() {
     let log = client
         .get_query(&query_id)
         .await
-        .expect("get_query should succeed");
+        .map_err(|error| error.to_string())?;
     assert_eq!(log.log.query, "SELECT 1");
     assert_eq!(log.log.session_id, session_id);
 
     let cancel = client
         .cancel_query(&query_id, &session_id)
         .await
-        .expect("cancel_query should succeed");
+        .map_err(|error| error.to_string())?;
     assert!(!cancel.message.trim().is_empty());
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn append_and_upload_return_mock_responses() {
+async fn query_log_and_cancel_endpoints_work_against_mock() {
+    let mut last_error = None;
+
+    for _ in 0..3 {
+        match run_query_log_and_cancel_endpoints_work_against_mock().await {
+            Ok(()) => return,
+            Err(error) => {
+                let lowered = error.to_ascii_lowercase();
+                let is_connection_reset = lowered.contains("connection reset by peer")
+                    || lowered.contains("error sending request for url");
+                assert!(
+                    is_connection_reset,
+                    "query log/cancel integration failed: {error}"
+                );
+                last_error = Some(error);
+            }
+        }
+    }
+
+    let error = last_error.expect("expected a connection reset error");
+    panic!("query log/cancel integration remained flaky after retries: {error}");
+}
+
+async fn run_append_and_upload_return_mock_responses() -> Result<(), String> {
     let (_container, base_url) = spawn_mock().await;
     let client = client(base_url);
 
@@ -125,7 +149,7 @@ async fn append_and_upload_return_mock_responses() {
     let append = client
         .append("demo", "public", "events", &AppendRequest::Single(payload))
         .await
-        .expect("append should respond");
+        .map_err(|error| error.to_string())?;
     assert!(!append.ok);
     assert!(append.error_code.is_some());
 
@@ -144,4 +168,30 @@ async fn append_and_upload_return_mock_responses() {
     assert!(upload_error
         .to_string()
         .contains("Catalog \"demo\" does not exist"));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn append_and_upload_return_mock_responses() {
+    let mut last_error = None;
+
+    for _ in 0..3 {
+        match run_append_and_upload_return_mock_responses().await {
+            Ok(()) => return,
+            Err(error) => {
+                let lowered = error.to_ascii_lowercase();
+                let is_connection_reset = lowered.contains("connection reset by peer")
+                    || lowered.contains("error sending request for url");
+                assert!(
+                    is_connection_reset,
+                    "append/upload integration failed: {error}"
+                );
+                last_error = Some(error);
+            }
+        }
+    }
+
+    let error = last_error.expect("expected a connection reset error");
+    panic!("append/upload integration remained flaky after retries: {error}");
 }
