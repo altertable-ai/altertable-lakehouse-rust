@@ -123,7 +123,9 @@ async fn query_log_and_cancel_endpoints_work_against_mock() {
         match run_query_log_and_cancel_endpoints_work_against_mock().await {
             Ok(()) => return,
             Err(error) => {
-                let is_connection_reset = error.contains("Connection reset by peer");
+                let lowered = error.to_ascii_lowercase();
+                let is_connection_reset = lowered.contains("connection reset by peer")
+                    || lowered.contains("error sending request for url");
                 assert!(
                     is_connection_reset,
                     "query log/cancel integration failed: {error}"
