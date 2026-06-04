@@ -182,7 +182,7 @@ client
 ### upload
 
 ```rust
-# use altertable_lakehouse::{AltertableClient, UploadFormat, UploadMode};
+# use altertable_lakehouse::{AltertableClient, UploadMode};
 # #[tokio::main]
 # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 # let client = AltertableClient::builder().credentials("testuser", "testpass").base_url("http://localhost:15000").build()?;
@@ -191,9 +191,9 @@ client
         "demo",
         "public",
         "users",
-        UploadFormat::Csv,
-        UploadMode::Append,
+        Some(UploadMode::Append),
         None,
+        Some("text/csv"),
         b"id,name\n1,Ada\n".to_vec(),
     )
     .await?;

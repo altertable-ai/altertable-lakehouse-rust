@@ -1,6 +1,5 @@
 use altertable_lakehouse::{
-    AltertableClient, AppendRequest, AutocompleteRequest, QueryRequest, UploadFormat, UploadMode,
-    ValidateRequest,
+    AltertableClient, AppendRequest, AutocompleteRequest, QueryRequest, UploadMode, ValidateRequest,
 };
 use futures_util::StreamExt;
 use serde_json::json;
@@ -161,9 +160,9 @@ async fn append_and_upload_return_mock_responses() {
             "demo",
             "public",
             "events",
-            UploadFormat::Csv,
-            UploadMode::Append,
+            Some(UploadMode::Append),
             None,
+            Some("text/csv"),
             b"id,name\n1,Ada\n".to_vec(),
         )
         .await
