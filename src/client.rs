@@ -1,12 +1,12 @@
 use crate::error::{AltertableError, ErrorContext};
 use crate::models::{
     AppendRequest, AppendResponse, AutocompleteRequest, AutocompleteResponse, CancelQueryResponse,
-    QueryColumn, QueryLogResponse, QueryMetadata, QueryRequest, QueryRow, TaskResponse,
-    UploadFormat, UploadMode, ValidateRequest, ValidateResponse,
+    QueryColumn, QueryLogResponse, QueryMetadata, QueryRequest, QueryRow, TaskResponse, UpsertMode,
+    ValidateRequest, ValidateResponse,
 };
 use base64::Engine;
 use futures_util::{Stream, StreamExt};
-use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE, USER_AGENT};
+use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Method, Response, StatusCode};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -267,57 +267,48 @@ impl AltertableClient {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub async fn upload(
+    pub async fn upsert(
         &self,
         catalog: &str,
         schema: &str,
         table: &str,
-        format: UploadFormat,
-        mode: UploadMode,
+        mode: Option<UpsertMode>,
         primary_key: Option<&str>,
         bytes: Vec<u8>,
     ) -> Result<TaskResponse, AltertableError> {
         ensure_non_empty("catalog", catalog)?;
         ensure_non_empty("schema", schema)?;
         ensure_non_empty("table", table)?;
-        if matches!(mode, UploadMode::Upsert) && primary_key.is_none() {
-            return Err(AltertableError::ConfigurationError {
-                message: "primary_key is required when mode=upsert".to_string(),
-            });
-        }
 
         let mut query = vec![
             ("catalog", catalog.to_string()),
             ("schema", schema.to_string()),
             ("table", table.to_string()),
-            (
-                "format",
-                serde_plain::to_string(&format).unwrap_or_else(|_| "json".to_string()),
-            ),
-            (
-                "mode",
-                serde_plain::to_string(&mode).unwrap_or_else(|_| "append".to_string()),
-            ),
         ];
+        if let Some(mode) = mode {
+            query.push((
+                "mode",
+                serde_plain::to_string(&mode).unwrap_or_else(|_| "upsert".to_string()),
+            ));
+        }
         if let Some(primary_key) = primary_key {
             query.push(("primary_key", primary_key.to_string()));
         }
 
         let response = self
-            .request("upload", Method::POST, "/upload")
+            .request("upsert", Method::POST, "/upsert")
             .query(&query)
-            .header(CONTENT_TYPE, "application/octet-stream")
             .body(bytes)
             .send()
             .await
             .map_err(|error| {
                 AltertableError::from_reqwest(
                     error,
-                    error_context("upload", "POST", "/upload", None, false, None),
+                    error_context("upsert", "POST", "/upsert", None, false, None),
                 )
             })?;
 
-        self.decode_response("upload", Method::POST, "/upload", response)
+        self.decode_response("upsert", Method::POST, "/upsert", response)
             .await
     }
 

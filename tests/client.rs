@@ -1,6 +1,6 @@
 use altertable_lakehouse::{
-    AltertableClient, AppendRequest, AutocompleteRequest, ComputeSize, QueryRequest, UploadFormat,
-    UploadMode, ValidateRequest,
+    AltertableClient, AppendRequest, AutocompleteRequest, ComputeSize, QueryRequest,
+    ValidateRequest,
 };
 use futures_util::StreamExt;
 use serde_json::json;
@@ -18,30 +18,6 @@ fn query_request_serializes_enums() {
     let value = serde_json::to_value(request).unwrap();
     assert_eq!(value["compute_size"], json!("XL"));
     assert_eq!(value["cache"], json!(true));
-}
-
-#[test]
-fn upload_mode_upsert_requires_primary_key() {
-    let client = AltertableClient::builder()
-        .credentials("user", "pass")
-        .base_url("http://localhost:15000")
-        .build()
-        .unwrap();
-
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    let error = runtime
-        .block_on(client.upload(
-            "catalog",
-            "schema",
-            "table",
-            UploadFormat::Json,
-            UploadMode::Upsert,
-            None,
-            br#"{"id":1}"#.to_vec(),
-        ))
-        .unwrap_err();
-
-    assert!(error.to_string().contains("primary_key is required"));
 }
 
 #[test]
