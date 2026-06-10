@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1](https://github.com/altertable-ai/altertable-lakehouse-rust/compare/altertable-lakehouse-v0.2.0...altertable-lakehouse-v0.2.1) (2026-06-10)
+
+
+### Bug Fixes
+
+* **api:** expose upsert API ([#11](https://github.com/altertable-ai/altertable-lakehouse-rust/issues/11)) ([d3a42a3](https://github.com/altertable-ai/altertable-lakehouse-rust/commit/d3a42a3880675d3b8587250b63765949f217fb23))
+
 ## [0.2.0](https://github.com/altertable-ai/altertable-lakehouse-rust/compare/altertable-lakehouse-v0.1.0...altertable-lakehouse-v0.2.0) (2026-05-27)
 
 
