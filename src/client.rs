@@ -1,12 +1,12 @@
 use crate::error::{AltertableError, ErrorContext};
 use crate::models::{
     AppendRequest, AppendResponse, AutocompleteRequest, AutocompleteResponse, CancelQueryResponse,
-    QueryColumn, QueryLogResponse, QueryMetadata, QueryRequest, QueryRow, TaskResponse, UploadMode,
+    QueryColumn, QueryLogResponse, QueryMetadata, QueryRequest, QueryRow, TaskResponse, UpsertMode,
     ValidateRequest, ValidateResponse,
 };
 use base64::Engine;
 use futures_util::{Stream, StreamExt};
-use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE, USER_AGENT};
+use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Method, Response, StatusCode};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -267,14 +267,13 @@ impl AltertableClient {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub async fn upload(
+    pub async fn upsert(
         &self,
         catalog: &str,
         schema: &str,
         table: &str,
-        mode: Option<UploadMode>,
+        mode: Option<UpsertMode>,
         primary_key: Option<&str>,
-        content_type: Option<&str>,
         bytes: Vec<u8>,
     ) -> Result<TaskResponse, AltertableError> {
         ensure_non_empty("catalog", catalog)?;
@@ -299,10 +298,6 @@ impl AltertableClient {
         let response = self
             .request("upsert", Method::POST, "/upsert")
             .query(&query)
-            .header(
-                CONTENT_TYPE,
-                content_type.unwrap_or("application/octet-stream"),
-            )
             .body(bytes)
             .send()
             .await

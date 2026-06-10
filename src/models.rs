@@ -42,7 +42,7 @@ pub enum ComputeSize {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum UploadMode {
+pub enum UpsertMode {
     Create,
     Append,
     Upsert,

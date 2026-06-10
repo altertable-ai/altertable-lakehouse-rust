@@ -4,11 +4,11 @@ Official Rust SDK for the Altertable Lakehouse API.
 
 ## Features
 
-- Typed client for `append`, `get_task`, `query`, `query_all`, `upload`, `get_query`, `cancel_query`, `validate`, and `autocomplete`
+- Typed client for `append`, `get_task`, `query`, `query_all`, `upsert`, `get_query`, `cancel_query`, `validate`, and `autocomplete`
 - Basic auth via direct credentials, pre-encoded token, or environment discovery
 - Streamed NDJSON query support with accumulated `query_all`
 - `reqwest` + `rustls` transport with keep-alive and sensible timeout defaults
-- Mock-backed integration coverage via Testcontainers for query, query_all, get_query, cancel_query, validate, autocomplete, append, and upload
+- Mock-backed integration coverage via Testcontainers for query, query_all, get_query, cancel_query, validate, autocomplete, append, and upsert
 - Request-level coverage for serialization, auth, request validation, and query parsing
 
 ## Installation
@@ -179,21 +179,20 @@ client
 # Ok(()) }
 ```
 
-### upload
+### upsert
 
 ```rust
-# use altertable_lakehouse::{AltertableClient, UploadMode};
+# use altertable_lakehouse::{AltertableClient, UpsertMode};
 # #[tokio::main]
 # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 # let client = AltertableClient::builder().credentials("testuser", "testpass").base_url("http://localhost:15000").build()?;
 client
-    .upload(
+    .upsert(
         "demo",
         "public",
         "users",
-        Some(UploadMode::Append),
+        Some(UpsertMode::Append),
         None,
-        Some("text/csv"),
         b"id,name\n1,Ada\n".to_vec(),
     )
     .await?;
