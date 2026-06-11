@@ -17,6 +17,7 @@ pub enum AppendRequest {
 #[serde(rename_all = "kebab-case")]
 pub enum AppendErrorCode {
     InvalidData,
+    IncompatibleSchema,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -32,22 +33,16 @@ pub struct AppendResponse {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ComputeSize {
+    XS,
     S,
     M,
     L,
+    XL,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum UploadFormat {
-    Csv,
-    Json,
-    Parquet,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum UploadMode {
+pub enum UpsertMode {
     Create,
     Append,
     Upsert,
@@ -94,6 +89,36 @@ pub struct ValidateRequest {
     pub schema: Option<String>,
     #[serde(default)]
     pub session_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct AutocompleteRequest {
+    pub statement: String,
+    #[serde(default)]
+    pub catalog: Option<String>,
+    #[serde(default)]
+    pub schema: Option<String>,
+    #[serde(default)]
+    pub session_id: Option<String>,
+    #[serde(default)]
+    pub max_suggestions: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AutocompleteSuggestion {
+    pub suggestion: String,
+    pub suggestion_start: i64,
+    pub suggestion_type: String,
+    pub suggestion_score: i64,
+    #[serde(default)]
+    pub extra_char: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AutocompleteResponse {
+    pub suggestions: Vec<AutocompleteSuggestion>,
+    pub statement: String,
+    pub connections_errors: HashMap<String, Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

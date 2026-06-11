@@ -4,11 +4,11 @@ Official Rust SDK for the Altertable Lakehouse API.
 
 ## Features
 
-- Typed client for `append`, `query`, `query_all`, `upload`, `get_query`, `cancel_query`, and `validate`
+- Typed client for `append`, `get_task`, `query`, `query_all`, `upsert`, `get_query`, `cancel_query`, `validate`, and `autocomplete`
 - Basic auth via direct credentials, pre-encoded token, or environment discovery
 - Streamed NDJSON query support with accumulated `query_all`
 - `reqwest` + `rustls` transport with keep-alive and sensible timeout defaults
-- Mock-backed integration coverage via Testcontainers for query, query_all, get_query, cancel_query, validate, append, and upload
+- Mock-backed integration coverage via Testcontainers for query, query_all, get_query, cancel_query, validate, autocomplete, append, and upsert
 - Request-level coverage for serialization, auth, request validation, and query parsing
 
 ## Installation
@@ -73,8 +73,35 @@ let payload = HashMap::from([
 ]);
 
 client
-    .append("demo", "public", "users", &AppendRequest::Single(payload))
+    .append(
+        "demo",
+        "public",
+        "users",
+        Some(false),
+        &AppendRequest::Single(payload),
+    )
     .await?;
+# Ok(()) }
+```
+
+### get_task
+
+```rust
+# use altertable_lakehouse::{AltertableClient, AppendRequest};
+# use serde_json::json;
+# use std::collections::HashMap;
+# #[tokio::main]
+# async fn main() -> Result<(), Box<dyn std::error::Error>> {
+# let client = AltertableClient::builder().credentials("testuser", "testpass").base_url("http://localhost:15000").build()?;
+let payload = HashMap::from([("id".to_string(), json!(1))]);
+let append = client
+    .append("demo", "public", "users", Some(false), &AppendRequest::Single(payload))
+    .await?;
+
+if let Some(task_id) = append.task_id {
+    let task = client.get_task(&task_id.to_string()).await?;
+    println!("task status = {:?}", task.status);
+}
 # Ok(()) }
 ```
 
@@ -152,20 +179,19 @@ client
 # Ok(()) }
 ```
 
-### upload
+### upsert
 
 ```rust
-# use altertable_lakehouse::{AltertableClient, UploadFormat, UploadMode};
+# use altertable_lakehouse::{AltertableClient, UpsertMode};
 # #[tokio::main]
 # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 # let client = AltertableClient::builder().credentials("testuser", "testpass").base_url("http://localhost:15000").build()?;
 client
-    .upload(
+    .upsert(
         "demo",
         "public",
         "users",
-        UploadFormat::Csv,
-        UploadMode::Append,
+        Some(UpsertMode::Append),
         None,
         b"id,name\n1,Ada\n".to_vec(),
     )
@@ -188,6 +214,25 @@ let response = client
     .await?;
 
 assert!(response.valid);
+# Ok(()) }
+```
+
+### autocomplete
+
+```rust
+# use altertable_lakehouse::{AltertableClient, AutocompleteRequest};
+# #[tokio::main]
+# async fn main() -> Result<(), Box<dyn std::error::Error>> {
+# let client = AltertableClient::builder().credentials("testuser", "testpass").base_url("http://localhost:15000").build()?;
+let response = client
+    .autocomplete(&AutocompleteRequest {
+        statement: "SEL".into(),
+        max_suggestions: Some(5),
+        ..Default::default()
+    })
+    .await?;
+
+println!("suggestions = {}", response.suggestions.len());
 # Ok(()) }
 ```
 

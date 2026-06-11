@@ -1,5 +1,5 @@
 use altertable_lakehouse::{
-    AltertableClient, AppendRequest, QueryRequest, UploadFormat, UploadMode, ValidateRequest,
+    AltertableClient, AppendRequest, AutocompleteRequest, QueryRequest, UpsertMode, ValidateRequest,
 };
 use futures_util::StreamExt;
 use serde_json::json;
@@ -76,6 +76,19 @@ async fn validate_and_query_endpoints_work_against_mock() {
         .await
         .expect("query_all should succeed");
     assert_eq!(query_all.rows, vec![json!(["1"]), json!([1])]);
+
+    let autocomplete = client
+        .autocomplete(&AutocompleteRequest {
+            statement: "SEL".into(),
+            max_suggestions: Some(5),
+            ..Default::default()
+        })
+        .await
+        .expect("autocomplete should succeed");
+    assert_eq!(autocomplete.statement, "SEL");
+    assert!(!autocomplete.suggestions.is_empty());
+    assert!(autocomplete.suggestions.len() <= 5);
+    assert!(autocomplete.connections_errors.is_empty());
 }
 
 async fn run_query_log_and_cancel_endpoints_work_against_mock() -> Result<(), String> {
@@ -139,7 +152,7 @@ async fn query_log_and_cancel_endpoints_work_against_mock() {
     panic!("query log/cancel integration remained flaky after retries: {error}");
 }
 
-async fn run_append_and_upload_return_mock_responses() -> Result<(), String> {
+async fn run_append_and_upsert_return_mock_responses() -> Result<(), String> {
     let (_container, base_url) = spawn_mock().await;
     let client = client(base_url);
 
@@ -147,25 +160,37 @@ async fn run_append_and_upload_return_mock_responses() -> Result<(), String> {
         .into_iter()
         .collect();
     let append = client
-        .append("demo", "public", "events", &AppendRequest::Single(payload))
+        .append(
+            "demo",
+            "public",
+            "events",
+            Some(false),
+            &AppendRequest::Single(payload),
+        )
         .await
         .map_err(|error| error.to_string())?;
     assert!(!append.ok);
     assert!(append.error_code.is_some());
+    if let Some(task_id) = append.task_id {
+        let task = client
+            .get_task(&task_id.to_string())
+            .await
+            .expect("get_task should succeed when append returns task_id");
+        assert_eq!(task.task_id, task_id);
+    }
 
-    let upload_error = client
-        .upload(
+    let upsert_error = client
+        .upsert(
             "demo",
             "public",
             "events",
-            UploadFormat::Csv,
-            UploadMode::Append,
+            Some(UpsertMode::Append),
             None,
             b"id,name\n1,Ada\n".to_vec(),
         )
         .await
-        .expect_err("upload should fail against missing catalog");
-    assert!(upload_error
+        .expect_err("upsert should fail against missing catalog");
+    assert!(upsert_error
         .to_string()
         .contains("Catalog \"demo\" does not exist"));
 
@@ -173,11 +198,11 @@ async fn run_append_and_upload_return_mock_responses() -> Result<(), String> {
 }
 
 #[tokio::test]
-async fn append_and_upload_return_mock_responses() {
+async fn append_and_upsert_return_mock_responses() {
     let mut last_error = None;
 
     for _ in 0..3 {
-        match run_append_and_upload_return_mock_responses().await {
+        match run_append_and_upsert_return_mock_responses().await {
             Ok(()) => return,
             Err(error) => {
                 let lowered = error.to_ascii_lowercase();
@@ -185,7 +210,7 @@ async fn append_and_upload_return_mock_responses() {
                     || lowered.contains("error sending request for url");
                 assert!(
                     is_connection_reset,
-                    "append/upload integration failed: {error}"
+                    "append/upsert integration failed: {error}"
                 );
                 last_error = Some(error);
             }
@@ -193,5 +218,5 @@ async fn append_and_upload_return_mock_responses() {
     }
 
     let error = last_error.expect("expected a connection reset error");
-    panic!("append/upload integration remained flaky after retries: {error}");
+    panic!("append/upsert integration remained flaky after retries: {error}");
 }
