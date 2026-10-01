@@ -1,21 +1,32 @@
 # Contributing to altertable-lakehouse-rust
 
-Thanks for helping improve the Altertable Lakehouse Rust SDK.
+## Development Setup
 
-## Workflow
+1. Fork and clone the repository
+2. Install dependencies: `cargo fetch`
+3. Run tests: `cargo test --all-features`
 
-1. Fork the repository
-2. Create a feature branch from `main`
-3. Add tests for every behavior change
-4. Run the full local validation suite
-5. Open a pull request against `main`
+## Making Changes
 
-## Local checks
+1. Create a branch from `main`
+2. Make your changes
+3. Add or update tests
+4. Run the full check suite: `cargo fmt --all --check && cargo clippy --all-targets --all-features -- -D warnings && cargo test --all-features`
+5. Commit using [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, etc.)
+6. Open a pull request
 
-```bash
-cargo fmt --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test
-```
+## Code Style
 
-Integration tests run against the Altertable mock server. In CI, the mock runs as a service container on `localhost:15000`. Locally, the test suite starts the mock with Testcontainers unless `CI=true`.
+This project uses `cargo clippy` for linting and `cargo fmt` for formatting. Run `cargo clippy --all-targets --all-features -- -D warnings` before committing.
+
+## Tests
+
+- Unit tests are required for all new functionality
+- Integration tests run in CI when credentials are available
+- Run tests locally: `cargo test --all-features`
+
+## Pull Requests
+
+- Keep PRs focused on a single change
+- Update `CHANGELOG.md` under `[Unreleased]`
+- Ensure CI passes before requesting review
