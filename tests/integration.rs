@@ -88,7 +88,7 @@ async fn validate_and_query_endpoints_work_against_mock() {
         .await
         .expect("autocomplete should succeed");
     assert_eq!(autocomplete.statement, "SEL");
-    assert!(!autocomplete.suggestions.is_empty());
+    assert_ne!(autocomplete.suggestions.len(), 0);
     assert!(autocomplete.suggestions.len() <= 5);
     assert!(autocomplete.connections_errors.is_empty());
 }
@@ -126,7 +126,7 @@ async fn query_log_and_cancel_endpoints_work_against_mock() {
         .cancel_query(&query_id, &session_id)
         .await
         .expect("cancel_query should succeed");
-    assert!(!cancel.message.trim().is_empty());
+    assert_ne!(cancel.message.trim(), "");
 }
 
 #[tokio::test]
