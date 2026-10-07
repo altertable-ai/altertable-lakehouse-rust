@@ -64,6 +64,8 @@ pub struct QueryRequest {
     #[serde(default)]
     pub offset: Option<u64>,
     #[serde(default)]
+    pub params: Option<Value>,
+    #[serde(default)]
     pub query_id: Option<String>,
     #[serde(default)]
     pub requested_by: Option<String>,

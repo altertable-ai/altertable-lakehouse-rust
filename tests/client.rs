@@ -21,6 +21,29 @@ fn query_request_serializes_enums() {
 }
 
 #[test]
+fn query_request_serializes_named_and_positional_bind_values() {
+    let named = QueryRequest {
+        statement: "select $min_age".into(),
+        params: Some(json!({"min_age": 25})),
+        ..Default::default()
+    };
+    let positional = QueryRequest {
+        statement: "select $1".into(),
+        params: Some(json!([25])),
+        ..Default::default()
+    };
+
+    assert_eq!(
+        serde_json::to_value(named).unwrap()["params"],
+        json!({"min_age": 25})
+    );
+    assert_eq!(
+        serde_json::to_value(positional).unwrap()["params"],
+        json!([25])
+    );
+}
+
+#[test]
 fn append_request_round_trips() {
     let payload: HashMap<String, serde_json::Value> =
         [(String::from("id"), json!(1))].into_iter().collect();
