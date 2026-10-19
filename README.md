@@ -120,7 +120,8 @@ let client = AltertableClient::builder()
 
 let mut result = client
     .query(&QueryRequest {
-        statement: "select 1 as value".into(),
+        statement: "select $min_age as value".into(),
+        params: Some(serde_json::json!({"min_age": 25})),
         ..Default::default()
     })
     .await?;

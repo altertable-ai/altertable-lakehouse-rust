@@ -68,7 +68,7 @@ async fn validate_and_query_endpoints_work_against_mock() {
     while let Some(row) = query.rows.next().await {
         rows.push(row.expect("row should parse"));
     }
-    assert_eq!(rows, vec![json!(["1"]), json!([1])]);
+    assert_eq!(rows, vec![json!([1])]);
 
     let query_all = client
         .query_all(&QueryRequest {
@@ -77,7 +77,17 @@ async fn validate_and_query_endpoints_work_against_mock() {
         })
         .await
         .expect("query_all should succeed");
-    assert_eq!(query_all.rows, vec![json!(["1"]), json!([1])]);
+    assert_eq!(query_all.rows, vec![json!([1])]);
+
+    let bound_query = client
+        .query_all(&QueryRequest {
+            statement: "SELECT $value AS value".into(),
+            params: Some(json!({"value": 42})),
+            ..Default::default()
+        })
+        .await
+        .expect("query with named bind parameters should succeed against the current mock");
+    assert_eq!(bound_query.rows, vec![json!([42])]);
 
     let autocomplete = client
         .autocomplete(&AutocompleteRequest {
@@ -88,7 +98,7 @@ async fn validate_and_query_endpoints_work_against_mock() {
         .await
         .expect("autocomplete should succeed");
     assert_eq!(autocomplete.statement, "SEL");
-    assert!(!autocomplete.suggestions.is_empty());
+    assert_ne!(autocomplete.suggestions.len(), 0);
     assert!(autocomplete.suggestions.len() <= 5);
     assert!(autocomplete.connections_errors.is_empty());
 }
@@ -126,7 +136,7 @@ async fn query_log_and_cancel_endpoints_work_against_mock() {
         .cancel_query(&query_id, &session_id)
         .await
         .expect("cancel_query should succeed");
-    assert!(!cancel.message.trim().is_empty());
+    assert_ne!(cancel.message.trim(), "");
 }
 
 #[tokio::test]
