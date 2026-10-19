@@ -9,6 +9,13 @@ All notable changes to this project will be documented in this file.
 * add named and positional query bind values through `QueryRequest.params`
 * split upload and upsert APIs for client specs v0.12.0
 
+## [0.3.0](https://github.com/altertable-ai/altertable-lakehouse-rust/compare/altertable-lakehouse-v0.2.1...altertable-lakehouse-v0.3.0) (2026-10-19)
+
+
+### Features
+
+* **query:** support bind parameters ([#19](https://github.com/altertable-ai/altertable-lakehouse-rust/issues/19)) ([85b6e95](https://github.com/altertable-ai/altertable-lakehouse-rust/commit/85b6e95c35e77b72d110c451835036ed11999111))
+
 ## [0.2.1](https://github.com/altertable-ai/altertable-lakehouse-rust/compare/altertable-lakehouse-v0.2.0...altertable-lakehouse-v0.2.1) (2026-06-10)
 
 
