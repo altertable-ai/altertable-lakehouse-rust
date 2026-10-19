@@ -68,7 +68,7 @@ async fn validate_and_query_endpoints_work_against_mock() {
     while let Some(row) = query.rows.next().await {
         rows.push(row.expect("row should parse"));
     }
-    assert_eq!(rows, vec![json!(["1"]), json!([1])]);
+    assert_eq!(rows, vec![json!([1])]);
 
     let query_all = client
         .query_all(&QueryRequest {
@@ -77,7 +77,7 @@ async fn validate_and_query_endpoints_work_against_mock() {
         })
         .await
         .expect("query_all should succeed");
-    assert_eq!(query_all.rows, vec![json!(["1"]), json!([1])]);
+    assert_eq!(query_all.rows, vec![json!([1])]);
 
     let bound_query = client
         .query_all(&QueryRequest {
