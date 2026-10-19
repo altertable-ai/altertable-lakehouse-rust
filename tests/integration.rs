@@ -79,6 +79,16 @@ async fn validate_and_query_endpoints_work_against_mock() {
         .expect("query_all should succeed");
     assert_eq!(query_all.rows, vec![json!(["1"]), json!([1])]);
 
+    let bound_query = client
+        .query_all(&QueryRequest {
+            statement: "SELECT $value AS value".into(),
+            params: Some(json!({"value": 42})),
+            ..Default::default()
+        })
+        .await
+        .expect("query with named bind parameters should succeed against the current mock");
+    assert_eq!(bound_query.rows, vec![json!([42])]);
+
     let autocomplete = client
         .autocomplete(&AutocompleteRequest {
             statement: "SEL".into(),
