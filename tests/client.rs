@@ -41,6 +41,15 @@ fn query_request_serializes_named_and_positional_bind_values() {
         serde_json::to_value(positional).unwrap()["params"],
         json!([25])
     );
+
+    let without_params = QueryRequest {
+        statement: "select 1".into(),
+        ..Default::default()
+    };
+    assert!(serde_json::to_value(without_params)
+        .unwrap()
+        .get("params")
+        .is_none());
 }
 
 #[test]

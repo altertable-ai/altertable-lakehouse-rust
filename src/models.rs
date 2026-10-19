@@ -63,7 +63,7 @@ pub struct QueryRequest {
     pub limit: Option<u64>,
     #[serde(default)]
     pub offset: Option<u64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub params: Option<Value>,
     #[serde(default)]
     pub query_id: Option<String>,
