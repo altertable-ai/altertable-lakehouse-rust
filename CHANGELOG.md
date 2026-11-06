@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Bug Fixes
+
+* Stream query rows as HTTP chunks arrive instead of buffering the complete response; report later parse errors during row iteration.
+
 ### Features
 
 * add named and positional query bind values through `QueryRequest.params`
