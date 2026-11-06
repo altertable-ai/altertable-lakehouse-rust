@@ -10,7 +10,7 @@ use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, USER_AGENT}
 use reqwest::{Client, Method, Response, StatusCode};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -514,78 +514,49 @@ impl AltertableClient {
             ));
         }
 
-        let bytes = response.bytes().await.map_err(|error| {
-            AltertableError::from_reqwest(
-                error,
-                error_context(
-                    "query",
-                    "POST",
-                    "/query",
-                    Some(status),
-                    false,
-                    Some(&headers),
-                ),
-            )
-        })?;
-        let text =
-            String::from_utf8(bytes.to_vec()).map_err(|error| AltertableError::ParseError {
-                context: error_context(
-                    "query",
-                    "POST",
-                    "/query",
-                    Some(status),
-                    false,
-                    Some(&headers),
-                ),
-                message: "query response was not valid UTF-8".to_string(),
-                line: None,
-                source: Some(Box::new(error)),
-            })?;
-
-        let mut metadata = None;
-        let mut columns = None;
-        let mut rows = VecDeque::new();
-
-        for (index, raw_line) in text.lines().enumerate() {
-            let line_no = index + 1;
-            let trimmed = raw_line.trim();
-            if trimmed.is_empty() {
-                continue;
+        let mut source = NdjsonResponse {
+            response,
+            buffer: Vec::new(),
+            consumed: 0,
+            scanned: 0,
+            eof: false,
+            line: 0,
+            context: error_context(
+                "query",
+                "POST",
+                "/query",
+                Some(status),
+                false,
+                Some(&headers),
+            ),
+        };
+        let metadata = source.next_value().await?.map_or_else(
+            || QueryMetadata {
+                values: HashMap::default(),
+            },
+            |value| parse_metadata(&value),
+        );
+        let mut columns = Vec::new();
+        let mut pending_row = None;
+        if let Some(value) = source.next_value().await? {
+            if is_columns_line(&value) {
+                columns = parse_columns(&value)?;
+            } else {
+                pending_row = Some(value);
             }
-
-            let value: Value =
-                serde_json::from_str(trimmed).map_err(|error| AltertableError::ParseError {
-                    context: error_context(
-                        "query",
-                        "POST",
-                        "/query",
-                        Some(status),
-                        false,
-                        Some(&headers),
-                    ),
-                    message: format!("failed to parse NDJSON line: {trimmed}"),
-                    line: Some(line_no),
-                    source: Some(Box::new(error)),
-                })?;
-
-            if metadata.is_none() {
-                metadata = Some(parse_metadata(&value));
-                continue;
-            }
-
-            if columns.is_none() && is_columns_line(&value) {
-                columns = Some(parse_columns(&value)?);
-                continue;
-            }
-
-            rows.push_back(value);
         }
-
-        let metadata = metadata.unwrap_or(QueryMetadata {
-            values: HashMap::default(),
-        });
-        let columns = columns.unwrap_or_default();
-        let stream = futures_util::stream::iter(rows.into_iter().map(Ok));
+        // Keep ownership of the response in the row stream. No background
+        // reader or row queue: reads follow the caller's demand.
+        let stream = futures_util::stream::try_unfold(
+            (source, pending_row),
+            |(mut source, pending)| async move {
+                let value = match pending {
+                    Some(value) => Some(value),
+                    None => source.next_value().await?,
+                };
+                Ok::<_, AltertableError>(value.map(|value| (value, (source, None))))
+            },
+        );
 
         Ok(QueryResult {
             metadata,
@@ -594,6 +565,66 @@ impl AltertableClient {
                 inner: Box::pin(stream),
             },
         })
+    }
+}
+
+// Retain only an unfinished line and the unread part of the current HTTP
+// chunk. Decode JSON from complete byte lines, so split UTF-8 stays intact.
+struct NdjsonResponse {
+    response: Response,
+    buffer: Vec<u8>,
+    consumed: usize,
+    scanned: usize,
+    eof: bool,
+    line: usize,
+    context: ErrorContext,
+}
+
+impl NdjsonResponse {
+    async fn next_value(&mut self) -> Result<Option<Value>, AltertableError> {
+        loop {
+            let newline = self.buffer[self.scanned..]
+                .iter()
+                .position(|byte| *byte == b'\n')
+                .map(|offset| self.scanned + offset);
+            if let Some(end) = newline.or_else(|| self.eof.then_some(self.buffer.len())) {
+                if self.eof && self.consumed == self.buffer.len() {
+                    return Ok(None);
+                }
+                let line = &self.buffer[self.consumed..end];
+                self.consumed = end + usize::from(newline.is_some());
+                self.scanned = self.consumed;
+                self.line += 1;
+                if line.iter().all(u8::is_ascii_whitespace) {
+                    continue;
+                }
+                return serde_json::from_slice(line).map(Some).map_err(|error| {
+                    AltertableError::ParseError {
+                        context: self.context.clone(),
+                        message: format!(
+                            "failed to parse NDJSON line: {}",
+                            String::from_utf8_lossy(line)
+                        ),
+                        line: Some(self.line),
+                        source: Some(Box::new(error)),
+                    }
+                });
+            }
+            if self.consumed > 0 {
+                self.buffer.drain(..self.consumed);
+                self.consumed = 0;
+            }
+            self.scanned = self.buffer.len();
+            match self
+                .response
+                .chunk()
+                .await
+                .map_err(|error| AltertableError::from_reqwest(error, self.context.clone()))?
+            {
+                Some(chunk) => self.buffer.extend_from_slice(&chunk),
+                None => self.eof = true,
+            }
+        }
     }
 }
 

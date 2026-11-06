@@ -107,6 +107,11 @@ if let Some(task_id) = append.task_id {
 
 ### query
 
+`query` reads the metadata and schema, then returns a lazy row stream. Rows are
+parsed as HTTP chunks arrive, retaining only the current chunk and unfinished
+line. Parsing or transport failures after the header are returned by row
+iteration. Use `query_all` when you want to collect all rows in memory.
+
 ```rust
 use altertable_lakehouse::{AltertableClient, QueryRequest};
 use futures_util::StreamExt;
